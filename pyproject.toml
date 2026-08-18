@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf2muse"
+version = "0.1.0"
+description = "Convert PDF sheet music to MuseScore files via Audiveris OMR"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+pdf2muse = "pdf2muse:main"
+
+[tool.setuptools]
+py-modules = ["pdf2muse"]
