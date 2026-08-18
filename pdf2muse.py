@@ -30,6 +30,8 @@ AUDIVERIS_DIRS = (
     r"C:\Program Files\Audiveris",
     r"C:\Program Files (x86)\Audiveris",
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\Audiveris"),
+    # Layout produced by extracting the MSI without admin rights (see README).
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\pdf2muse-tools\audiveris\Audiveris"),
     "/opt/audiveris/bin",
     "/usr/local/bin",
 )
@@ -44,6 +46,7 @@ MUSESCORE_DIRS = (
     r"C:\Program Files\MuseScore 4\bin",
     r"C:\Program Files\MuseScore 3\bin",
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\MuseScore 4\bin"),
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\pdf2muse-tools\musescore\MuseScore 4\bin"),
     "/Applications/MuseScore 4.app/Contents/MacOS",
     "/usr/bin",
     "/usr/local/bin",

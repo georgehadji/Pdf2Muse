@@ -6,9 +6,15 @@ dist/
 .venv/
 venv/
 
+.ruff_cache/
+.pytest_cache/
+
 # Local scratch and conversion output
 *.mscz
 *.mscx
 *.mxl
 *.musicxml
 out/
+
+# ...but the round-trip ground truth is checked in
+!fixtures/*.musicxml
