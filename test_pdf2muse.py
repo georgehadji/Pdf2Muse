@@ -72,8 +72,9 @@ def test_find_tool_missing():
 
 
 def test_resolve_output():
+    # Default lands in Outputs/, NOT beside the input.
     args = argparse.Namespace(output=None, outdir=None, format=".mscz")
-    assert p.resolve_output(Path("/in/song.pdf"), args) == Path("/in/song.mscz")
+    assert p.resolve_output(Path("/in/song.pdf"), args) == Path("Outputs/song.mscz")
 
     args = argparse.Namespace(output=None, outdir=Path("/out"), format=".mscx")
     assert p.resolve_output(Path("/in/song.pdf"), args) == Path("/out/song.mscx")

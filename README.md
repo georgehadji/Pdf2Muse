@@ -62,7 +62,8 @@ Or just run the single module directly: `python pdf2muse.py ...`
 
 ## Usage
 
-Convert one score:
+Convert one score. Output goes to `Outputs/score.mscz` — the `Outputs/`
+directory is relative to where you run the command, and is created if missing:
 
 ```bash
 pdf2muse score.pdf
@@ -97,7 +98,7 @@ pdf2muse symphony.pdf --timeout 3600
 | Flag | Meaning |
 |------|---------|
 | `-o`, `--output` | Output file path (single input only) |
-| `-d`, `--outdir` | Output directory (default: alongside each input) |
+| `-d`, `--outdir` | Output directory (default: `Outputs/`, created if missing) |
 | `-f`, `--format` | `.mscz` (default) or `.mscx` |
 | `--keep-xml` | Also keep the intermediate MusicXML |
 | `--timeout` | Per-step timeout in seconds (default 900) |

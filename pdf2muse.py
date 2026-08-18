@@ -22,6 +22,10 @@ from pathlib import Path
 MUSESCORE_EXTS = (".mscz", ".mscx")
 SCORE_PATTERNS = ("*.mxl", "*.musicxml", "*.xml")
 
+# Converted scores land here unless -o/--outdir says otherwise. Relative, so it
+# resolves against the working directory and is created on demand.
+DEFAULT_OUTDIR = Path("Outputs")
+
 # OMR is slow; a dense orchestral page can take minutes.
 DEFAULT_TIMEOUT = 900
 
@@ -220,7 +224,8 @@ def build_parser():
     )
     parser.add_argument(
         "-d", "--outdir", type=Path,
-        help="Directory for outputs (default: alongside each input).",
+        help=f"Directory for outputs (default: {DEFAULT_OUTDIR}/, created if "
+             f"missing).",
     )
     parser.add_argument(
         "-f", "--format", default=".mscz", choices=MUSESCORE_EXTS,
@@ -247,7 +252,7 @@ def resolve_output(pdf, args):
     """Work out the output path for one input PDF."""
     if args.output:
         return args.output
-    directory = args.outdir if args.outdir else pdf.parent
+    directory = args.outdir if args.outdir else DEFAULT_OUTDIR
     return Path(directory) / (pdf.stem + args.format)
 
 
