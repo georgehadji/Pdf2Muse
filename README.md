@@ -107,6 +107,42 @@ Multi-movement scores produce one file per movement, suffixed `-1`, `-2`, ...
 Exit code is `0` on success, `1` if any input failed, `2` if a required
 external tool is missing.
 
+## Lyrics and chord symbols (OCR)
+
+Audiveris reads lyrics and chord symbols with Tesseract, and it drives Tesseract
+in **legacy** mode. That has a trap: a normal Tesseract 5 install ships
+LSTM-only language files, which legacy mode cannot load. Audiveris then logs
+
+```
+WARN  TesseractOrder | Could not initialize TessBaseAPI languages: eng in legacy mode
+INFO  OcrUtil        | No OCR'd lines
+```
+
+and exports a score with **every lyric and chord symbol silently missing** —
+the run still exits 0. If your output has no chord symbols, check for that line.
+
+The fix is the combined legacy+LSTM data from
+[tesseract-ocr/tessdata](https://github.com/tesseract-ocr/tessdata) (`eng` is
+~23 MB there, versus ~4 MB for an LSTM-only build — size is the quick tell):
+
+```powershell
+$td = "$env:LOCALAPPDATA\Programs\pdf2muse-tools\tessdata"
+mkdir $td -Force
+curl.exe -sSL -o "$td\eng.traineddata" https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+$env:TESSDATA_PREFIX = $td
+```
+
+On this machine that took chord symbols from 0 to 49 on a 42-measure lead sheet.
+
+### Known limitation: non-Latin lyrics
+
+Audiveris OCRs with English only by default, so Greek lyrics come back as Latin
+lookalikes (`στέ` → `crré`). The `--language eng+ell` flag sets
+`org.audiveris.omr.text.Language.ocrDefaultLanguages`, but **on Audiveris 5.11
+this was accepted without error and did not change the output** — treat the flag
+as unverified. Setting the language per book in the Audiveris GUI
+(Book → Set Book Parameters) is the reliable route until this is understood.
+
 ## Speed
 
 Expect **minutes, not seconds**. A 4-measure single-staff score took ~5.7 min

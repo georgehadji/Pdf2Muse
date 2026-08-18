@@ -123,14 +123,26 @@ def collect_scores(directory):
     return sorted(found, key=lambda p: (str(p.parent), p.name))
 
 
-def run_audiveris(exe, pdf, workdir, timeout):
+def run_audiveris(exe, pdf, workdir, timeout, languages=None):
     """Transcribe a PDF, returning the MusicXML files produced."""
     # -export implies -transcribe. '--' guards filenames that start with '-'.
+    #
+    # Audiveris applies its own per-sheet step timeout (default ~120s) and aborts
+    # the whole export when it trips -- which pre-empts our --timeout entirely.
+    # OCR-heavy pages routinely exceed it. Derive it from our own budget so
+    # --timeout is the single authoritative control.
     cmd = [
         str(exe), "-batch", "-export",
+        "-constant", f"org.audiveris.omr.Main.sheetStepTimeOut={timeout}",
         "-output", str(workdir),
-        "--", str(pdf),
     ]
+    if languages:
+        # Audiveris OCRs with English only by default, which mangles other
+        # scripts (Greek lyrics come back as Latin lookalikes) rather than
+        # failing outright. Tesseract spec syntax, e.g. "eng+ell".
+        cmd += ["-constant",
+                f"org.audiveris.omr.text.Language.ocrDefaultLanguages={languages}"]
+    cmd += ["--", str(pdf)]
     _run(cmd, timeout, "Audiveris")
 
     scores = collect_scores(workdir)
@@ -173,7 +185,8 @@ def target_for(base, index, total):
     return base.with_name(f"{base.stem}-{index + 1}{base.suffix}")
 
 
-def convert_pdf(pdf, out_base, audiveris, musescore, timeout, keep_xml=False):
+def convert_pdf(pdf, out_base, audiveris, musescore, timeout, keep_xml=False,
+                languages=None):
     """Run the full pipeline for one PDF. Returns the MuseScore files written."""
     pdf = Path(pdf)
     if not pdf.is_file():
@@ -182,7 +195,7 @@ def convert_pdf(pdf, out_base, audiveris, musescore, timeout, keep_xml=False):
     written = []
     workdir = Path(tempfile.mkdtemp(prefix="pdf2muse-"))
     try:
-        scores = run_audiveris(audiveris, pdf, workdir, timeout)
+        scores = run_audiveris(audiveris, pdf, workdir, timeout, languages)
         for index, score in enumerate(scores):
             target = target_for(out_base, index, len(scores))
             written.append(to_musescore(musescore, score, target, timeout))
@@ -212,6 +225,12 @@ def build_parser():
     parser.add_argument(
         "-f", "--format", default=".mscz", choices=MUSESCORE_EXTS,
         help="Output format when -o is not given (default: .mscz)",
+    )
+    parser.add_argument(
+        "-l", "--language",
+        help="OCR language(s) for lyrics and chord symbols, Tesseract spec "
+             "syntax (e.g. 'eng', 'eng+ell'). Default: Audiveris' own setting, "
+             "normally English only.",
     )
     parser.add_argument(
         "--keep-xml", action="store_true",
@@ -262,7 +281,7 @@ def main(argv=None):
         try:
             for path in convert_pdf(
                 pdf, resolve_output(pdf, args), audiveris, musescore,
-                args.timeout, args.keep_xml,
+                args.timeout, args.keep_xml, args.language,
             ):
                 print(f"    wrote {path}")
         except ConversionError as exc:
