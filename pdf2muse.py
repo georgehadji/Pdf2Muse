@@ -92,8 +92,13 @@ def find_tool(env_var, names, dirs, label, hint):
 def _run(cmd, timeout, label, env=None):
     """Run a subprocess, turning failure into a ConversionError with useful output."""
     try:
+        # Decode as UTF-8 explicitly. Defaulting to the system locale breaks on
+        # non-ASCII tool output (e.g. cp1253 on a Greek Windows install), and the
+        # failure lands in a subprocess reader thread where it does NOT propagate
+        # -- subprocess.run returns "successfully" with the output lost.
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, env=env
+            cmd, capture_output=True, timeout=timeout, env=env,
+            encoding="utf-8", errors="replace",
         )
     except FileNotFoundError as exc:
         raise ConversionError(f"Could not execute {label}: {exc}") from exc

@@ -95,6 +95,36 @@ def test_cli_rejects_bad_usage():
             assert exc.code == 2, (argv, exc.code)
 
 
+def test_run_decodes_utf8():
+    """Regression: locale decoding lost tool output on non-UTF-8 systems.
+
+    With text=True and no explicit encoding, Python decodes subprocess output
+    using the system locale (cp1253 on a Greek Windows install). Non-ASCII bytes
+    then raised UnicodeDecodeError inside subprocess's reader thread, where it
+    did not propagate -- run() returned "successfully" with the output gone.
+    """
+    import sys as _sys
+
+    greek = "Χριστέ"  # Χριστέ
+    proc = p._run(
+        [_sys.executable, "-c", f"print({greek!r})"], 30, "python",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+    assert greek in proc.stdout, repr(proc.stdout)
+
+
+def test_run_survives_undecodable_bytes():
+    """Raw invalid bytes must not crash the pipeline; errors='replace' handles it."""
+    import sys as _sys
+
+    proc = p._run(
+        [_sys.executable, "-c",
+         "import sys; sys.stdout.buffer.write(b'ok\\x81\\xfe done')"],
+        30, "python",
+    )
+    assert "ok" in proc.stdout and "done" in proc.stdout, repr(proc.stdout)
+
+
 def test_convert_pdf_rejects_missing_input():
     try:
         p.convert_pdf(Path("nope-does-not-exist.pdf"), Path("o.mscz"), "a", "m", 5)
