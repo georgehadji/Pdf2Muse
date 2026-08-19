@@ -36,6 +36,39 @@ export PDF2MUSE_AUDIVERIS="C:/Program Files/Audiveris/Audiveris.exe"
 export PDF2MUSE_MUSESCORE="C:/Program Files/MuseScore 4/bin/MuseScore4.exe"
 ```
 
+### Which MuseScore gets used, and why it matters
+
+MuseScore refuses to open a score saved by a **newer** version:
+
+```
+Cannot read file ...mscz:
+The score was saved using a newer version of MuseScore.
+```
+
+So the MuseScore that writes the file must be no newer than the one you open it
+with. pdf2muse therefore searches your own installs first — `Program Files`,
+then Microsoft Store packages — and only falls back to a copy under
+`pdf2muse-tools` if nothing else is found.
+
+Store installs need a detour: `C:\Program Files\WindowsApps` cannot be listed
+without elevation, so globbing it finds nothing even though a known full path
+inside it opens fine. `store_app_dirs()` reads the package folder names from the
+per-user Appx registry instead and builds those paths directly.
+
+Check which one will be used:
+
+```bash
+python -c "import pdf2muse as p; print(p.find_tool('PDF2MUSE_MUSESCORE', p.MUSESCORE_NAMES, p.MUSESCORE_DIRS, 'MuseScore', ''))"
+```
+
+If you have both an old and a new MuseScore and want a specific one, set
+`PDF2MUSE_MUSESCORE` explicitly. Already produced an unopenable file? You do not
+need to redo the OMR — re-render the kept MusicXML with the older MuseScore:
+
+```bash
+MuseScore3 -o score.mscz score.mxl
+```
+
 ### Installing without admin rights
 
 Both MSIs normally install to `Program Files`, which needs elevation. If you do

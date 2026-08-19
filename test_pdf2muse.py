@@ -61,6 +61,31 @@ def test_find_tool_override():
         real.unlink(missing_ok=True)
 
 
+def test_store_app_dirs():
+    # Never raises, whatever the platform or registry state.
+    assert isinstance(p.store_app_dirs("definitely-no-such-package-xyz"), tuple)
+    assert p.store_app_dirs("definitely-no-such-package-xyz") == ()
+
+    if os.name == "nt":
+        # WindowsApps cannot be listed without elevation, so any result must
+        # have come from the registry rather than a directory scan.
+        for found in p.store_app_dirs("MuseScore"):
+            assert "WindowsApps" in found and found.endswith("bin"), found
+
+
+def test_musescore_dirs_prefer_user_install_over_bundled():
+    # A score written by a newer MuseScore will not open in an older one, so
+    # the bundled fallback must be searched last.
+    bundled = [i for i, d in enumerate(p.MUSESCORE_DIRS) if "pdf2muse-tools" in d]
+    assert bundled, "bundled fallback missing from search path"
+    store = [i for i, d in enumerate(p.MUSESCORE_DIRS) if "WindowsApps" in d]
+    for index in store:
+        assert index < bundled[0], "store install must be searched before bundled"
+    for index, directory in enumerate(p.MUSESCORE_DIRS):
+        if "Program Files\\MuseScore" in directory:
+            assert index < bundled[0], "real install must be searched before bundled"
+
+
 def test_find_tool_missing():
     os.environ.pop("PDF2MUSE_ABSENT", None)
     try:

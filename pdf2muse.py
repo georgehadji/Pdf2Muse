@@ -46,18 +46,56 @@ AUDIVERIS_HINT = (
 )
 
 MUSESCORE_NAMES = ("MuseScore4", "MuseScore3", "mscore", "musescore")
+MUSESCORE_HINT = (
+    "Install it from https://musescore.org/download, or set PDF2MUSE_MUSESCORE "
+    "to the full path of the executable."
+)
+
+
+def store_app_dirs(keyword, subdir="bin"):
+    """Locate Microsoft Store app folders whose package name contains keyword.
+
+    C:\\Program Files\\WindowsApps cannot be listed without elevation, so
+    globbing it finds nothing even though a known full path inside it opens
+    fine. The package folder names are readable from the per-user Appx registry
+    instead, which lets us build those full paths directly.
+    """
+    if os.name != "nt":
+        return ()
+    try:
+        import winreg
+    except ImportError:  # pragma: no cover - Windows always has winreg
+        return ()
+
+    key_path = (r"Software\Classes\Local Settings\Software\Microsoft\Windows"
+                r"\CurrentVersion\AppModel\Repository\Packages")
+    packages = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            for index in range(winreg.QueryInfoKey(key)[0]):
+                name = winreg.EnumKey(key, index)
+                if keyword.lower() in name.lower():
+                    packages.append(name)
+    except OSError:
+        return ()
+
+    base = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsApps"
+    # Newest package version first; the name embeds the version.
+    return tuple(str(base / name / subdir) for name in sorted(packages, reverse=True))
+
+
 MUSESCORE_DIRS = (
     r"C:\Program Files\MuseScore 4\bin",
     r"C:\Program Files\MuseScore 3\bin",
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\MuseScore 4\bin"),
+    # Store installs come before the bundled copy below on purpose. MuseScore
+    # refuses to open a score written by a newer version, so whatever the user
+    # actually has installed must win over the copy we ship as a fallback.
+    *store_app_dirs("MuseScore"),
     os.path.expandvars(r"%LOCALAPPDATA%\Programs\pdf2muse-tools\musescore\MuseScore 4\bin"),
     "/Applications/MuseScore 4.app/Contents/MacOS",
     "/usr/bin",
     "/usr/local/bin",
-)
-MUSESCORE_HINT = (
-    "Install it from https://musescore.org/download, or set PDF2MUSE_MUSESCORE "
-    "to the full path of the executable."
 )
 
 
