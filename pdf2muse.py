@@ -182,8 +182,12 @@ def run_audiveris(exe, pdf, workdir, timeout, languages=None):
         # Audiveris OCRs with English only by default, which mangles other
         # scripts (Greek lyrics come back as Latin lookalikes) rather than
         # failing outright. Tesseract spec syntax, e.g. "eng+ell".
+        # Key is Language$Constants.defaultSpecification, declared as
+        # Constant.String("eng", "OCR language(s)"). Audiveris accepts an
+        # unknown -constant key without complaint, so a wrong name here fails
+        # silently rather than erroring.
         cmd += ["-constant",
-                f"org.audiveris.omr.text.Language.ocrDefaultLanguages={languages}"]
+                f"org.audiveris.omr.text.Language.defaultSpecification={languages}"]
     cmd += ["--", str(pdf)]
     _run(cmd, timeout, "Audiveris")
 
