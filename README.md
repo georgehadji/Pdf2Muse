@@ -168,14 +168,30 @@ $env:TESSDATA_PREFIX = $td
 
 On this machine that took chord symbols from 0 to 49 on a 42-measure lead sheet.
 
-### Known limitation: non-Latin lyrics
+### Non-Latin lyrics
 
 Audiveris OCRs with English only by default, so Greek lyrics come back as Latin
-lookalikes (`στέ` → `crré`). The `--language eng+ell` flag sets
-`org.audiveris.omr.text.Language.ocrDefaultLanguages`, but **on Audiveris 5.11
-this was accepted without error and did not change the output** — treat the flag
-as unverified. Setting the language per book in the Audiveris GUI
-(Book → Set Book Parameters) is the reliable route until this is understood.
+lookalikes (`στέ` → `crré`). Pass the languages you need:
+
+```bash
+pdf2muse score.pdf --language eng+ell
+```
+
+Include `eng` even for a non-English score. Chord symbols (`Bm`, `D`, `Em`) are
+Latin, and dropping English loses them. Measured on a 42-measure Greek lead
+sheet:
+
+| `--language` | Chord symbols | Lyrics |
+|--------------|---------------|--------|
+| unset (`eng`) | 49 | none readable — pure Latin lookalikes |
+| `eng+ell` | 47 | partly Greek |
+| `ell` | **0** | best Greek |
+
+`eng+ell` is the sensible default for mixed content. Use `ell` alone only for a
+second, lyrics-focused pass you intend to merge by hand.
+
+Small lyric text under a staff is the hardest thing on the page for OCR — expect
+to proofread it either way.
 
 ## Speed
 
