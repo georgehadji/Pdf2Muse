@@ -6,6 +6,7 @@
 
 import argparse
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -149,6 +150,67 @@ def test_run_survives_undecodable_bytes():
         30, "python",
     )
     assert "ok" in proc.stdout and "done" in proc.stdout, repr(proc.stdout)
+
+
+def _stub_tools():
+    """Make find_tool succeed without depending on installed binaries."""
+    os.environ["PDF2MUSE_AUDIVERIS"] = sys.executable
+    os.environ["PDF2MUSE_MUSESCORE"] = sys.executable
+
+
+def test_batch_survives_oserror_in_one_input():
+    """D1: an OSError on one input must not abandon the remaining inputs.
+
+    mkdir/copy2 raise OSError for unwritable or invalid output paths. Letting
+    it escape discarded every later input after minutes of OMR each.
+    """
+    _stub_tools()
+    with tempfile.TemporaryDirectory() as tmp:
+        first, second = Path(tmp) / "a.pdf", Path(tmp) / "b.pdf"
+        first.write_bytes(b"%PDF-1.4\n")
+        second.write_bytes(b"%PDF-1.4\n")
+
+        seen = []
+        original = p.convert_pdf
+
+        def fake(pdf, *args, **kwargs):
+            seen.append(Path(pdf).name)
+            if Path(pdf).name == "a.pdf":
+                raise OSError(28, "No space left on device")
+            return [Path("ok.mscz")]
+
+        p.convert_pdf = fake
+        try:
+            code = p.main([str(first), str(second), "--outdir", tmp])
+        finally:
+            p.convert_pdf = original
+
+        assert seen == ["a.pdf", "b.pdf"], f"batch stopped early: {seen}"
+        assert code == 1, f"expected failure exit code, got {code}"
+
+
+def test_output_extension_is_case_insensitive():
+    """D2: Windows/macOS filesystems are case-insensitive, so .MSCZ is valid."""
+    _stub_tools()
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf = Path(tmp) / "a.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n")
+        original = p.convert_pdf
+        p.convert_pdf = lambda *a, **k: []
+        try:
+            for ext in (".mscz", ".MSCZ", ".Mscz", ".MSCX"):
+                code = p.main([str(pdf), "-o", str(Path(tmp) / f"out{ext}")])
+                assert code == 0, f"{ext} rejected (exit {code})"
+
+            # Boundary: genuinely wrong extensions must STILL be rejected.
+            for bad in ("out.pdf", "out.PDF", "out"):
+                try:
+                    p.main([str(pdf), "-o", str(Path(tmp) / bad)])
+                    raise AssertionError(f"{bad} should be rejected")
+                except SystemExit as exc:
+                    assert exc.code == 2, (bad, exc.code)
+        finally:
+            p.convert_pdf = original
 
 
 def test_convert_pdf_rejects_missing_input():

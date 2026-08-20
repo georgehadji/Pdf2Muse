@@ -193,6 +193,22 @@ second, lyrics-focused pass you intend to merge by hand.
 Small lyric text under a staff is the hardest thing on the page for OCR — expect
 to proofread it either way.
 
+### Merging two OCR passes
+
+To get both — chord symbols from `eng+ell` and the better lyrics from `ell` —
+run the score twice and graft the lyrics across:
+
+```bash
+pdf2muse score.pdf --language eng+ell --keep-xml
+pdf2muse score.pdf --language ell --outdir pass2 --keep-xml
+python merge_lyrics.py Outputs/score.mxl pass2/score.mxl merged.musicxml
+MuseScore4 -o Outputs/score.mscz merged.musicxml
+```
+
+`merge_lyrics.py` refuses to graft unless both passes agree on every note, since
+notes come from OMR rather than OCR and should be identical. Misaligned notes
+would scatter the words across the score, so it errors out instead of guessing.
+
 ## Speed
 
 Expect **minutes, not seconds**. A 4-measure single-staff score took ~5.7 min

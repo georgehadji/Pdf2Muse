@@ -303,7 +303,9 @@ def main(argv=None):
 
     if args.output and len(args.inputs) > 1:
         build_parser().error("-o/--output takes a single input; use --outdir instead.")
-    if args.output and args.output.suffix not in MUSESCORE_EXTS:
+    # Compare case-insensitively: Windows and macOS filesystems are, so
+    # "out.MSCZ" names a perfectly valid file and must not be refused.
+    if args.output and args.output.suffix.lower() not in MUSESCORE_EXTS:
         build_parser().error(
             f"Output must end in one of {', '.join(MUSESCORE_EXTS)}; "
             f"got {args.output.suffix or 'no extension'!r}."
@@ -331,7 +333,10 @@ def main(argv=None):
                 args.timeout, args.keep_xml, args.language,
             ):
                 print(f"    wrote {path}")
-        except ConversionError as exc:
+        except (ConversionError, OSError) as exc:
+            # OSError too: mkdir and copy2 raise it for unwritable or invalid
+            # output paths, and letting it escape aborts the whole batch --
+            # discarding every remaining input after minutes of OMR each.
             print(f"error: {exc}", file=sys.stderr)
             failures += 1
 
