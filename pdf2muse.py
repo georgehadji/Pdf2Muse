@@ -26,8 +26,9 @@ SCORE_PATTERNS = ("*.mxl", "*.musicxml", "*.xml")
 # resolves against the working directory and is created on demand.
 DEFAULT_OUTDIR = Path("Outputs")
 
-# OMR is slow; a dense orchestral page can take minutes.
-DEFAULT_TIMEOUT = 900
+# OMR is slow. A 42-measure lead sheet with OCR enabled overran 900s, so that
+# is too tight to be a useful default; raise it further for orchestral scores.
+DEFAULT_TIMEOUT = 1800
 
 AUDIVERIS_NAMES = ("Audiveris", "audiveris")
 AUDIVERIS_DIRS = (

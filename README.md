@@ -120,7 +120,7 @@ Keep the intermediate MusicXML for inspection or manual repair:
 pdf2muse score.pdf --keep-xml
 ```
 
-Raise the per-step timeout for long or dense scores (default 900s):
+Raise the per-step timeout for long or dense scores (default 1800s):
 
 ```bash
 pdf2muse symphony.pdf --timeout 3600
@@ -134,7 +134,7 @@ pdf2muse symphony.pdf --timeout 3600
 | `-d`, `--outdir` | Output directory (default: `Outputs/`, created if missing) |
 | `-f`, `--format` | `.mscz` (default) or `.mscx` |
 | `--keep-xml` | Also keep the intermediate MusicXML |
-| `--timeout` | Per-step timeout in seconds (default 900) |
+| `--timeout` | Per-step timeout in seconds (default 1800) |
 
 Multi-movement scores produce one file per movement, suffixed `-1`, `-2`, ...
 
@@ -212,9 +212,10 @@ would scatter the words across the score, so it errors out instead of guessing.
 ## Speed
 
 Expect **minutes, not seconds**. A 4-measure single-staff score took ~5.7 min
-end to end. Most of that is fixed cost — JVM start plus Audiveris pipeline
-warm-up — so longer scores do not scale linearly, but budget accordingly and
-raise `--timeout` for anything substantial.
+end to end; a 42-measure lead sheet with `--language eng+ell` took ~14 min and
+overran the old 900s default. Much of that is fixed cost — JVM start plus
+Audiveris pipeline warm-up — so longer scores do not scale linearly, but budget
+accordingly and raise `--timeout` for anything substantial.
 
 ## Accuracy expectations
 
