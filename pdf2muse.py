@@ -52,6 +52,12 @@ MUSESCORE_HINT = (
 )
 
 
+def _pkg_version(name):
+    """Version fields from an Appx folder name: Publisher.App_4.10.0.0_x64__hash."""
+    version = name.split("_")[1] if "_" in name else ""
+    return [int(part) if part.isdigit() else -1 for part in version.split(".")]
+
+
 def store_app_dirs(keyword, subdir="bin"):
     """Locate Microsoft Store app folders whose package name contains keyword.
 
@@ -80,8 +86,10 @@ def store_app_dirs(keyword, subdir="bin"):
         return ()
 
     base = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsApps"
-    # Newest package version first; the name embeds the version.
-    return tuple(str(base / name / subdir) for name in sorted(packages, reverse=True))
+    # Newest version first. The name embeds it, but lexicographic order puts
+    # 4.9 above 4.10, so sort on the numeric fields instead.
+    packages.sort(key=_pkg_version, reverse=True)
+    return tuple(str(base / name / subdir) for name in packages)
 
 
 MUSESCORE_DIRS = (
@@ -213,9 +221,18 @@ def musescore_env():
 def to_musescore(exe, score, out_path, timeout):
     """Convert one MusicXML file to .mscz/.mscx. Extension decides the format."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    existed = out_path.exists()
     # Absolute paths: MuseScore 4 resolves relative ones unpredictably in batch use.
     cmd = [str(exe), "-o", str(out_path.resolve()), str(Path(score).resolve())]
-    _run(cmd, timeout, "MuseScore", env=musescore_env())
+    try:
+        _run(cmd, timeout, "MuseScore", env=musescore_env())
+    except ConversionError:
+        # A killed or failed MuseScore can leave a truncated file that reads as
+        # a successful conversion. Remove only what this run created -- a file
+        # that was already there is not ours to delete.
+        if not existed:
+            out_path.unlink(missing_ok=True)
+        raise
 
     if not out_path.is_file():
         raise ConversionError(
@@ -310,6 +327,19 @@ def main(argv=None):
             f"Output must end in one of {', '.join(MUSESCORE_EXTS)}; "
             f"got {args.output.suffix or 'no extension'!r}."
         )
+
+    # Two inputs with the same stem resolve to one output path: the second
+    # destroys the first, yet both are reported written and the exit code is 0.
+    # Catch it before spending minutes of OMR per input.
+    seen = {}
+    for pdf in args.inputs:
+        target = resolve_output(pdf, args)
+        if target in seen:
+            build_parser().error(
+                f"{pdf} and {seen[target]} both map to {target}; "
+                f"convert them separately or use -o."
+            )
+        seen[target] = pdf
 
     try:
         audiveris = find_tool(

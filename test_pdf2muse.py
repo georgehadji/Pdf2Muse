@@ -8,8 +8,10 @@ import argparse
 import os
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
+import merge_lyrics as m
 import pdf2muse as p
 
 
@@ -219,6 +221,114 @@ def test_convert_pdf_rejects_missing_input():
         raise AssertionError("expected ConversionError")
     except p.ConversionError as exc:
         assert "not found" in str(exc), exc
+
+
+def test_colliding_output_paths_rejected():
+    """D1: two inputs sharing a stem land on one path; the second erased the first.
+
+    Both were still reported as written and the exit code stayed 0, so the loss
+    was silent -- after minutes of OMR each.
+    """
+    _stub_tools()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for sub in ("a", "b"):
+            (root / sub).mkdir()
+            (root / sub / "score.pdf").write_bytes(b"%PDF-1.4\n")
+
+        try:
+            p.main([str(root / "a" / "score.pdf"), str(root / "b" / "score.pdf"),
+                    "-d", str(root / "out")])
+            raise AssertionError("expected rejection for colliding output paths")
+        except SystemExit as exc:
+            assert exc.code == 2, exc.code
+
+        # Boundary: distinct stems must still be accepted.
+        (root / "a" / "other.pdf").write_bytes(b"%PDF-1.4\n")
+        original = p.convert_pdf
+        p.convert_pdf = lambda *a, **k: []
+        try:
+            code = p.main([str(root / "a" / "score.pdf"), str(root / "a" / "other.pdf"),
+                           "-d", str(root / "out")])
+            assert code == 0, code
+        finally:
+            p.convert_pdf = original
+
+
+def test_failed_conversion_leaves_no_partial_output():
+    """D2: a killed MuseScore left a truncated file that looked like success."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "song.mscz"
+        original = p._run
+
+        def fake(cmd, timeout, label, env=None):
+            out.write_bytes(b"PK\x03\x04truncated")   # MuseScore got partway
+            raise p.ConversionError("MuseScore timed out after 900s.")
+
+        p._run = fake
+        try:
+            try:
+                p.to_musescore("mscore", Path(tmp) / "s.mxl", out, 900)
+                raise AssertionError("expected ConversionError")
+            except p.ConversionError:
+                pass
+            assert not out.exists(), "partial output survived the error"
+
+            # Boundary: a file this run did NOT create must survive.
+            keep = Path(tmp) / "keep.mscz"
+            keep.write_bytes(b"pre-existing")
+
+            def fake_keep(cmd, timeout, label, env=None):
+                raise p.ConversionError("MuseScore failed (exit 1).")
+
+            p._run = fake_keep
+            try:
+                p.to_musescore("mscore", Path(tmp) / "s.mxl", keep, 900)
+                raise AssertionError("expected ConversionError")
+            except p.ConversionError:
+                pass
+            assert keep.exists(), "deleted a file this run did not create"
+        finally:
+            p._run = original
+
+
+def test_package_version_sort_is_numeric():
+    """D4: lexicographic order put 4.9 above 4.10, so the OLDER package won."""
+    names = ["MuseScore.MuseScore_4.9.0.0_x64__abc",
+             "MuseScore.MuseScore_4.10.0.0_x64__abc",
+             "MuseScore.MuseScore_3.6.2.0_x64__abc"]
+    ordered = sorted(names, key=p._pkg_version, reverse=True)
+    assert ordered[0].startswith("MuseScore.MuseScore_4.10."), ordered
+    assert ordered[-1].startswith("MuseScore.MuseScore_3."), ordered
+    # Malformed names must not raise, and must sort last.
+    assert p._pkg_version("nounderscore") == [-1]
+    assert p._pkg_version("App_neutral_x64") == [-1]
+
+
+SCORE_XML = (b'<?xml version="1.0"?><score-partwise><part><measure/>'
+             b'</part></score-partwise>')
+
+
+def test_merge_reads_uppercase_mxl():
+    """D5: .MXL is a real filename on a case-insensitive filesystem."""
+    with tempfile.TemporaryDirectory() as tmp:
+        upper = Path(tmp) / "score.MXL"
+        with zipfile.ZipFile(upper, "w") as archive:
+            archive.writestr("score.xml", SCORE_XML)
+        assert m.load(upper).tag == "score-partwise"
+
+
+def test_merge_reports_empty_container():
+    """D6: a container with no score raised bare StopIteration at the user."""
+    with tempfile.TemporaryDirectory() as tmp:
+        empty = Path(tmp) / "empty.mxl"
+        with zipfile.ZipFile(empty, "w") as archive:
+            archive.writestr("META-INF/container.xml", "<container/>")
+        try:
+            m.load(empty)
+            raise AssertionError("expected SystemExit")
+        except SystemExit as exc:
+            assert "no MusicXML" in str(exc), exc
 
 
 if __name__ == "__main__":

@@ -15,12 +15,15 @@ LY = "lyric"
 
 def load(path):
     path = Path(path)
-    if path.suffix != ".mxl":
+    # Case-insensitive: on Windows/macOS "score.MXL" names the same file.
+    if path.suffix.lower() != ".mxl":
         return ET.parse(path).getroot()
     with zipfile.ZipFile(path) as z:
-        name = next(n for n in z.namelist()
-                    if n.endswith((".xml", ".musicxml")) and not n.startswith("META-INF"))
-        return ET.fromstring(z.read(name))
+        names = [n for n in z.namelist()
+                 if n.endswith((".xml", ".musicxml")) and not n.startswith("META-INF")]
+        if not names:
+            raise SystemExit(f"{path}: no MusicXML inside the .mxl container")
+        return ET.fromstring(z.read(names[0]))
 
 
 def pitches(root):
@@ -80,4 +83,6 @@ def main(target_path, source_path, out_path):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        raise SystemExit("usage: merge_lyrics.py TARGET SOURCE OUT.musicxml")
     main(*sys.argv[1:4])
